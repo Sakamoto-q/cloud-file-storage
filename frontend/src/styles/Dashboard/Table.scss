@@ -1,0 +1,174 @@
+@use "@/styles/variables" as *;
+
+.files-container {
+    padding: 1rem;
+    background: white;
+}
+
+.state-message {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: $gray-500;
+
+    svg-icon {
+        display: block;
+        margin: 0 auto 1rem;
+        width: 48px;
+        height: 48px;
+        color: $gray-300;
+    }
+
+    &.error svg-icon {
+        color: $danger;
+    }
+}
+
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid $gray-200;
+    border-top-color: $primary;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+.files-list {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+}
+
+.file-item {
+    border: 1.5px solid $gray-200;
+    border-radius: $radius-md;
+    background: white;
+    cursor: pointer;
+    transition: $transition;
+
+    &:hover,
+    &:focus {
+        border-color: $primary;
+        box-shadow: $shadow-md;
+        outline: none;
+    }
+}
+
+.file-info {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1rem;
+    padding: 1rem;
+
+    .filename {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        font-weight: 500;
+        color: $gray-900;
+        font-size: 14px;
+
+        span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+
+    .meta {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        font-size: 13px;
+        color: $gray-500;
+
+        .access {
+            display: flex;
+            align-items: center;
+            gap: .25rem;
+        }
+    }
+}
+
+.action-menu {
+    position: fixed;
+    z-index: 1000;
+    background: white;
+    border: 1.5px solid $gray-200;
+    border-radius: $radius-md;
+    box-shadow: $shadow-md;
+    padding: .5rem;
+    width: 160px;
+    max-width: 160px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+
+    .menu-btn {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .5rem .75rem;
+        border: 1.5px solid transparent;
+        border-radius: $radius-sm;
+        background: transparent;
+        color: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: $transition;
+
+        svg-icon {
+            width: 16px;
+            height: 16px;
+        }
+
+        &.preview {
+            border-color: $primary;
+            color: $primary;
+
+            &:hover {
+                background: $primary;
+                color: white;
+            }
+        }
+
+        &.share {
+            border-color: $success;
+            color: $success;
+
+            &:hover {
+                background: $success;
+                color: white;
+            }
+        }
+
+        &.delete {
+            border-color: $danger;
+            color: $danger;
+
+            &:hover {
+                background: $danger;
+                color: white;
+            }
+        }
+    }
+}
+
+.menu-enter-active,
+.menu-leave-active {
+    transition: all .15s ease;
+}
+
+.menu-enter-from,
+.menu-leave-to {
+    opacity: 0;
+    transform: scale(.95) translateY(-8px);
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
