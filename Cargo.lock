@@ -1010,7 +1010,6 @@ dependencies = [
  "actix-web",
  "aws-config",
  "aws-sdk-s3",
- "base64 0.22.1",
  "bcrypt",
  "cf-turnstile",
  "chrono",
@@ -1022,6 +1021,7 @@ dependencies = [
  "snowflake-id-generator",
  "sqlx",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -3600,6 +3600,7 @@ version = "1.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f87b8aa10b915a06587d0dec516c282ff295b475d94abf425d62b57710070a2"
 dependencies = [
+ "getrandom 0.3.4",
  "js-sys",
  "wasm-bindgen",
 ]

@@ -23,6 +23,17 @@ pub struct File {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Session {
+    pub id: String,
+    pub user_id: String,
+    pub session_key: String,
+    pub ip_address: Option<String>,
+    pub user_agent: Option<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub last_accessed_at: chrono::DateTime<chrono::Utc>,
+}
+
 pub struct MySQLClient {
     pool: Pool<MySql>,
 }
@@ -272,5 +283,103 @@ impl MySQLClient {
         let file = file.unwrap();
         
         Ok(file.owner_id == user_id)
+    }
+
+    pub async fn create_session(
+        &self,
+        id: &str,
+        user_id: &str,
+        session_key: &str,
+        ip_address: Option<&str>,
+        user_agent: Option<&str>,
+    ) -> Result<Session, Box<dyn Error>> {
+        let now = chrono::Utc::now();
+        
+        sqlx::query(
+            "INSERT INTO sessions (id, user_id, session_key, ip_address, user_agent, created_at, last_accessed_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        )
+        .bind(id)
+        .bind(user_id)
+        .bind(session_key)
+        .bind(ip_address)
+        .bind(user_agent)
+        .bind(now)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+
+        let session = query_as::<_, Session>(
+            "SELECT id, user_id, session_key, ip_address, user_agent, created_at, last_accessed_at FROM sessions WHERE id = ?"
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        println!("✓ Session created for user: {}", user_id);
+        Ok(session)
+    }
+
+    pub async fn get_session(&self, session_key: &str) -> Result<Option<Session>, Box<dyn Error>> {
+        let session = query_as::<_, Session>(
+            "SELECT id, user_id, session_key, ip_address, user_agent, created_at, last_accessed_at FROM sessions WHERE session_key = ?"
+        )
+        .bind(session_key)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(session)
+    }
+
+    pub async fn verify_session(&self, session_key: &str, ip_address: &str) -> Result<Option<Session>, Box<dyn Error>> {
+        if let Some(session) = self.get_session(session_key).await? {
+            if let Some(stored_ip) = &session.ip_address {
+                if stored_ip == ip_address {
+                    return Ok(Some(session.clone()));
+                }
+            }
+        }
+        
+        Ok(None)
+    }
+
+    pub async fn update_session_access_time(&self, session_key: &str) -> Result<(), Box<dyn Error>> {
+        let now = chrono::Utc::now();
+        
+        sqlx::query("UPDATE sessions SET last_accessed_at = ? WHERE session_key = ?")
+            .bind(now)
+            .bind(session_key)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn get_user_sessions(&self, user_id: &str) -> Result<Vec<Session>, Box<dyn Error>> {
+        let sessions = query_as::<_, Session>(
+            "SELECT id, user_id, session_key, ip_address, user_agent, created_at, last_accessed_at FROM sessions WHERE user_id = ?"
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(sessions)
+    }
+
+    pub async fn delete_session(&self, session_key: &str) -> Result<(), Box<dyn Error>> {
+        sqlx::query("DELETE FROM sessions WHERE session_key = ?")
+            .bind(session_key)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn delete_user_sessions(&self, user_id: &str) -> Result<(), Box<dyn Error>> {
+        sqlx::query("DELETE FROM sessions WHERE user_id = ?")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
     }
 }

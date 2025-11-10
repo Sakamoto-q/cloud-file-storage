@@ -53,24 +53,6 @@ impl S3Client {
         Ok(presigned_req.uri().to_string())
     }
 
-    pub async fn list(&self) -> Result<Vec<String>, Box<dyn Error>> {
-        let response = self.client
-            .list_objects_v2()
-            .bucket(&self.bucket)
-            .send()
-            .await?;
-
-        let mut keys = Vec::new();
-        
-        for obj in response.contents() {
-            if let Some(key) = obj.key() {
-                keys.push(key.to_string());
-            }
-        }
-        
-        Ok(keys)
-    }
-
     pub async fn delete_object(&self, key: &str) -> Result<(), Box<dyn Error>> {
         self.client.delete_object()
             .bucket(&self.bucket)

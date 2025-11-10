@@ -1,3 +1,3 @@
-pub mod basic;
+pub mod bearer;
 
-pub use basic::basic_auth;
+pub use bearer::{get_client_ip, bearer_auth};

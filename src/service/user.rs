@@ -3,8 +3,8 @@ use crate::router::AppState;
 use crate::encrypt::Bcrypt;
 use serde::Deserialize;
 use serde_json::json;
-use crate::middleware::basic_auth;
 use cf_turnstile::SiteVerifyRequest;
+use crate::middleware::get_client_ip;
 
 const MIN_PASSWORD_LENGTH: usize = 8;
 
@@ -88,6 +88,7 @@ macro_rules! error_response {
 pub async fn create_user_handler(
     state: web::Data<AppState>,
     req_body: web::Json<CreateUserRequest>,
+    req: HttpRequest,
 ) -> HttpResponse {
     if let Err(e) = validate_create_user_input(&req_body) {
         return e.to_response();
@@ -162,61 +163,41 @@ pub async fn create_user_handler(
     let user_id = state.snowflake.generate().await.to_string();
 
     match state.mysql.create_user(&user_id, email, &hashed_password).await {
-        Ok(_) => HttpResponse::Created().json(json!({
-            "data": {
-                "id": user_id,
-                "email": email
+        Ok(user) => {
+            let ip_address = get_client_ip(&req);
+            let session_key = state.snowflake.generate().await.to_string();
+            let session_id = state.snowflake.generate().await.to_string();
+            let user_agent = req
+                .headers()
+                .get("User-Agent")
+                .and_then(|h| h.to_str().ok())
+                .map(|s| s.to_string());
+
+            match state.mysql.create_session(&session_id, &user.id, &session_key, Some(&ip_address), user_agent.as_deref()).await {
+                Ok(_) => HttpResponse::Ok().json(json!({
+                    "data": {
+                        "id": user.id,
+                        "email": user.email,
+                        "icon_url": user.icon_url,
+                        "created_at": user.created_at,
+                        "session_key": session_key,
+                    }
+                })),
+                Err(e) => {
+                    error_response!(
+                        HttpResponse::InternalServerError(),
+                        "SESSION_CREATE_FAILED",
+                        "Failed to create session",
+                        e.to_string()
+                    )
+                }
             }
-        })),
+        },
         Err(e) => error_response!(
             HttpResponse::InternalServerError(),
             "CREATE_FAILED",
             "Failed to create user",
             e.to_string()
         ),
-    }
-}
-
-pub async fn get_user_handler(
-    state: web::Data<AppState>,
-    req: HttpRequest,
-) -> HttpResponse {
-    let user_id = match basic_auth(state.clone(), req).await {
-        Ok(id) => id,
-        Err(e) => {
-            return error_response!(
-                HttpResponse::Unauthorized(),
-                "AUTH_FAILED",
-                "Authentication failed",
-                e.to_string()
-            )
-        }
-    };
-
-    match state.mysql.get_user(&user_id).await {
-        Ok(Some(user)) => HttpResponse::Ok().json(json!({
-            "data": {
-                "id": user.id,
-                "email": user.email,
-                "icon_url": user.icon_url,
-                "created_at": user.created_at
-            }
-        })),
-        Ok(None) => {
-            error_response!(
-                HttpResponse::NotFound(),
-                "USER_NOT_FOUND",
-                "User not found",
-                ""
-            )
-        }
-        Err(e) => {
-            error_response!(
-                HttpResponse::InternalServerError(),
-                "DB_ERROR",
-                "Failed to retrieve user",
-                e.to_string()
-            )
-        }
     }
 }

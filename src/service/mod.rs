@@ -1,18 +1,24 @@
 pub mod user;
 pub mod content;
+pub mod session;
 
 pub use user::{
-    create_user_handler,
-    get_user_handler
+    create_user_handler
 };
 
 pub use content::{
     index_handler,
     get_turnstile,
-    file_info_handler, 
-    file_upload_handler, 
-    file_list_handler, 
-    file_delete_handler, 
-    file_share_update_handler, 
-    file_share_handler
+    get_file_details_handler, 
+    create_file_handler, 
+    list_files_handler, 
+    delete_file_handler, 
+    update_file_access_handler, 
+    get_download_url_handler
+};
+
+pub use session::{
+    session_info_handler,
+    logout_handler,
+    login_handler,
 };

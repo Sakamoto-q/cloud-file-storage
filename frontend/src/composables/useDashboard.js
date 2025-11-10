@@ -20,8 +20,8 @@ export function useDashboard() {
     const headerRef = ref(null)
     const showUpload = ref(false)
 
-    function header(email, pw) {
-        return "Basic " + btoa(`${email}:${pw}`)
+    function header(session) {
+        return "Bearer " + session
     }
 
     const getHeaders = () => ({
@@ -30,20 +30,22 @@ export function useDashboard() {
 
     async function Login(email = "", pw = "") {
         try {
-            let headers = ""
-            if (!email || !pw) {
-                headers = localStorage.getItem('header')
-                if (!headers) return
+            var response
+            if (email == "" || pw == "") {
+                response = await axios.get(window.api + "/session", {
+                    headers: getHeaders()
+                })
             } else {
-                headers = header(email, pw)
+                response = await axios.post(window.api + "/session", {
+                    email: email,
+                    password: pw,
+                })
             }
-            const response = await axios.get(window.api + "/user", {
-                headers: { 'Authorization': headers }
-            })
             if (response.status === 200) {
+                const headers = header(response.data.data.session_key)
                 localStorage.setItem('header', headers)
-                userData.value = response.data.data
                 localStorage.setItem('userData', JSON.stringify(response.data.data))
+                userData.value = response.data.data
                 logined.value = true
                 await fetchFiles()
             }
@@ -57,7 +59,7 @@ export function useDashboard() {
         try {
             const response = await axios.post(window.api + "/user", { email, password: pw, turnstile })
             if ([200, 201].includes(response.status)) {
-                const headers = header(email, pw)
+                const headers = header(response.data.data.session_key)
                 localStorage.setItem('header', headers)
                 userData.value = response.data.data
                 localStorage.setItem('userData', JSON.stringify(response.data.data))
@@ -149,12 +151,18 @@ export function useDashboard() {
         }
     }
 
-    function handleLogout() {
-        localStorage.removeItem('header')
-        localStorage.removeItem('userData')
-        logined.value = false
-        userData.value = null
-        files.value = []
+    async function handleLogout() {
+        try {
+            await axios.delete(window.api + "/session/" + JSON.parse(localStorage.getItem('userData')).session_id, { headers: getHeaders() })
+        } catch (err) {
+            console.error(err)
+        } finally {
+            localStorage.removeItem('header')
+            localStorage.removeItem('userData')
+            logined.value = false
+            userData.value = null
+            files.value = []
+        }
     }
 
     async function handleFileSelect(event) {

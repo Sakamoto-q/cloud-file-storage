@@ -1,6 +1,6 @@
 use actix_web::{web, HttpRequest, HttpResponse};
 use crate::router::AppState;
-use crate::middleware::basic_auth;
+use crate::middleware::bearer_auth;
 use serde::Deserialize;
 use serde_json::json;
 use std::fs;
@@ -57,12 +57,12 @@ pub async fn get_turnstile(state: web::Data<AppState>) -> HttpResponse {
         .body(state.turnstile_sitekey.clone())
 }
 
-pub async fn file_upload_handler(
+pub async fn create_file_handler(
     state: web::Data<AppState>,
     req: HttpRequest,
     body: web::Json<FileUploadRequest>,
 ) -> HttpResponse {
-    let user_id = match basic_auth(state.clone(), req).await {
+    let session = match bearer_auth(state.clone(), &req).await {
         Ok(id) => id,
         Err(e) => return auth_error!(e),
     };
@@ -70,7 +70,7 @@ pub async fn file_upload_handler(
     let file_id = state.snowflake.generate().await.to_string();
     let filename = body.filename.as_deref().unwrap_or(&file_id).to_string();
 
-    if let Err(e) = state.mysql.create_file(&file_id, &filename, &user_id, "[]").await {
+    if let Err(e) = state.mysql.create_file(&file_id, &filename, &session.user_id, "[]").await {
         return db_error!("DB_ERROR", "Failed to create file record in database", e);
     }
 
@@ -80,28 +80,28 @@ pub async fn file_upload_handler(
                 "id": file_id,
                 "filename": filename,
                 "url": url,
-                "user_id": user_id,
-                "owner_id": user_id
+                "user_id": session.user_id,
+                "owner_id": session.user_id
             }
         })),
         Err(e) => db_error!("UPLOAD_FAILED", "Failed to generate upload URL", e),
     }
 }
 
-pub async fn file_share_update_handler(
+pub async fn update_file_access_handler(
     state: web::Data<AppState>,
     path: web::Path<String>,
     req: HttpRequest,
     body: web::Json<UpdateAccessRequest>,
 ) -> HttpResponse {
-    let user_id = match basic_auth(state.clone(), req).await {
+    let session = match bearer_auth(state.clone(), &req).await {
         Ok(id) => id,
         Err(e) => return auth_error!(e),
     };
 
     let file_id = path.into_inner();
 
-    let is_owner = match state.mysql.check_user_is_owner(&file_id, &user_id).await {
+    let is_owner = match state.mysql.check_user_is_owner(&file_id, &session.user_id).await {
         Ok(owner) => owner,
         Err(e) => return db_error!("DB_ERROR", "Failed to verify file ownership", e),
     };
@@ -111,7 +111,7 @@ pub async fn file_share_update_handler(
             "error": {
                 "code": "ACCESS_DENIED",
                 "message": "Only file owner can update access permissions",
-                "detail": format!("User {} is not the owner of file {}", user_id, file_id)
+                "detail": format!("User {} is not the owner of file {}", session.user_id, file_id)
             }
         }));
     }
@@ -160,19 +160,19 @@ pub async fn file_share_update_handler(
     }
 }
 
-pub async fn file_info_handler(
+pub async fn get_file_details_handler(
     state: web::Data<AppState>,
     path: web::Path<String>,
     req: HttpRequest,
 ) -> HttpResponse {
-    let user_id = match basic_auth(state.clone(), req).await {
+    let session = match bearer_auth(state.clone(), &req).await {
         Ok(id) => id,
         Err(e) => return auth_error!(e),
     };
 
     let file_id = path.into_inner();
 
-    let has_access = match state.mysql.check_user_can_access(&file_id, &user_id).await {
+    let has_access = match state.mysql.check_user_can_access(&file_id, &session.user_id).await {
         Ok(access) => access,
         Err(e) => return db_error!("DB_ERROR", "Failed to check file access", e),
     };
@@ -182,7 +182,7 @@ pub async fn file_info_handler(
             "error": {
                 "code": "ACCESS_DENIED",
                 "message": "You don't have permission to access this file",
-                "detail": format!("User {} cannot access file {}", user_id, file_id)
+                "detail": format!("User {} cannot access file {}", session.user_id, file_id)
             }
         }));
     }
@@ -207,19 +207,19 @@ pub async fn file_info_handler(
     }
 }
 
-pub async fn file_share_handler(
+pub async fn get_download_url_handler(
     state: web::Data<AppState>,
     path: web::Path<String>,
     req: HttpRequest,
 ) -> HttpResponse {
-    let user_id = match basic_auth(state.clone(), req).await {
+    let session = match bearer_auth(state.clone(), &req).await {
         Ok(id) => id,
         Err(e) => return auth_error!(e),
     };
 
     let file_id = path.into_inner();
 
-    let has_access = match state.mysql.check_user_can_access(&file_id, &user_id).await {
+    let has_access = match state.mysql.check_user_can_access(&file_id, &session.user_id).await {
         Ok(access) => access,
         Err(e) => return db_error!("DB_ERROR", "Failed to check file access", e),
     };
@@ -229,7 +229,7 @@ pub async fn file_share_handler(
             "error": {
                 "code": "ACCESS_DENIED",
                 "message": "You don't have permission to access this file",
-                "detail": format!("User {} cannot access file {}", user_id, file_id)
+                "detail": format!("User {} cannot access file {}", session.user_id, file_id)
             }
         }));
     }
@@ -238,7 +238,7 @@ pub async fn file_share_handler(
         Ok(url) => HttpResponse::Ok().json(json!({
             "data": {
                 "url": url,
-                "user_id": user_id,
+                "user_id": session.user_id,
                 "file_id": file_id
             }
         })),
@@ -246,16 +246,16 @@ pub async fn file_share_handler(
     }
 }
 
-pub async fn file_list_handler(
+pub async fn list_files_handler(
     state: web::Data<AppState>,
     req: HttpRequest,
 ) -> HttpResponse {
-    let user_id = match basic_auth(state.clone(), req).await {
+    let session = match bearer_auth(state.clone(), &req).await {
         Ok(id) => id,
         Err(e) => return auth_error!(e),
     };
 
-    match state.mysql.list_user_files(&user_id).await {
+    match state.mysql.list_user_files(&session.user_id).await {
         Ok(files) => HttpResponse::Ok().json(json!({
             "data": {
                 "files": files
@@ -265,19 +265,19 @@ pub async fn file_list_handler(
     }
 }
 
-pub async fn file_delete_handler(
+pub async fn delete_file_handler(
     state: web::Data<AppState>,
     path: web::Path<String>,
     req: HttpRequest,
 ) -> HttpResponse {
-    let user_id = match basic_auth(state.clone(), req).await {
+    let session = match bearer_auth(state.clone(), &req).await {
         Ok(id) => id,
         Err(e) => return auth_error!(e),
     };
 
     let file_id = path.into_inner();
 
-    let is_owner = match state.mysql.check_user_is_owner(&file_id, &user_id).await {
+    let is_owner = match state.mysql.check_user_is_owner(&file_id, &session.user_id).await {
         Ok(owner) => owner,
         Err(e) => return db_error!("DB_ERROR", "Failed to check file ownership", e),
     };
@@ -287,7 +287,7 @@ pub async fn file_delete_handler(
             "error": {
                 "code": "ACCESS_DENIED",
                 "message": "Only file owner can delete this file",
-                "detail": format!("User {} is not the owner of file {}", user_id, file_id)
+                "detail": format!("User {} is not the owner of file {}", session.user_id, file_id)
             }
         }));
     }
