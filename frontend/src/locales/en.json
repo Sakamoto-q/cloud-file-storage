@@ -44,5 +44,11 @@
     "delete_confirm": "Are you sure you want to delete?",
     "upload_fail": "Upload failed: {error}",
     "alert_already_user": "User already added",
-    "file_select": "Select File"
+    "file_select": "Select File",
+    "settings": "Account Settings",
+    "loading_sessions": "Loading sessions...",
+    "current_session": "Current session",
+    "logout_session": "Logout session",
+    "logging_out": "Logging out...",
+    "no_active_sessions": "No active sessions."
 }

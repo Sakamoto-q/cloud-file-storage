@@ -23,23 +23,23 @@
                 <span>{{ $t('upload') }}</span>
             </button>
 
-            <button class="action-btn logout" @click="handleLogout" :aria-label="$t('logout')">
-                <LogOut :size="20" />
-                <span>{{ $t('logout') }}</span>
+            <button class="action-btn settings" @click="handleSetting" :aria-label="$t('settings')">
+                <Settings :size="20" />
+                <span>{{ $t('settings') }}</span>
             </button>
         </div>
     </div>
 </template>
 
 <script setup>
-import { Upload, LogOut } from 'lucide-vue-next'
+import { Upload, Settings } from 'lucide-vue-next'
 
 const props = defineProps({
-    userData: Object
+    userData: { type: Object, required: true },
 })
 
-const emit = defineEmits(['show-upload', 'logout'])
-const handleLogout = () => emit('logout')
+const emit = defineEmits(['show-upload', 'setting'])
+const handleSetting = () => emit('setting')
 </script>
 
 <style scoped lang="scss">

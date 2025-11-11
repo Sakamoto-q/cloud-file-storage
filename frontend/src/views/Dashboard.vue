@@ -5,7 +5,7 @@
             <Header 
                 ref="headerRef"
                 :userData="userData"
-                @logout="handleLogout"
+                @setting="handleSetting"
                 @show-upload="showUpload = true"
             />
 
@@ -20,7 +20,8 @@
                 />
             </transition>
 
-            <Table 
+            <Table
+                v-if="!showSetting"
                 :files="files"
                 :loading="loading"
                 :error="error"
@@ -28,6 +29,12 @@
                 @preview="handlePreview"
                 @share="handleShareClick"
                 @delete="handleDelete"
+            />
+
+            <Setting
+                v-if="showSetting"
+                :userData="userData"
+                @logout="handleLogout"
             />
 
             <transition name="fade">
@@ -56,6 +63,7 @@ import Header from '@/components/Dashboard/Header.vue'
 import Table from '@/components/Dashboard/Table.vue'
 import Preview from '@/components/Dashboard/Preview.vue'
 import Share from '@/components/Dashboard/Share.vue'
+import Setting from '@/components/Dashboard/Setting.vue'
 import { useDashboard } from '@/composables/useDashboard.js'
 
 const {
@@ -64,6 +72,7 @@ const {
     files,
     loading,
     error,
+    authToken,
     previewFile,
     shareModal,
     shareEmails,
@@ -72,14 +81,16 @@ const {
     uploadProgress,
     isUploading,
     headerRef,
+    showSetting,
     showUpload,
     Login,
     Signup,
+    handleLogout,
+    handleSetting,
     handlePreview,
     handleShareClick,
     handleSaveShare,
     handleDelete,
-    handleLogout,
     handleFileSelect,
     openUploadInput
 } = useDashboard()

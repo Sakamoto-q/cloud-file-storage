@@ -44,5 +44,11 @@
     "delete_confirm": "정말 삭제하시겠습니까?",
     "upload_fail": "업로드 실패: {error}",
     "alert_already_user": "이미 추가된 사용자입니다",
-    "file_select": "파일 선택"
+    "file_select": "파일 선택",
+    "settings": "계정 설정",
+    "loading_sessions": "세션 정보를 불러오는 중...",
+    "current_session": "현재 세션",
+    "logout_session": "세션 로그아웃",
+    "logging_out": "로그아웃 중...",
+    "no_active_sessions": "활성 세션이 없습니다."
 }

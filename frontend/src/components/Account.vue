@@ -58,8 +58,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, inject } from 'vue';
 import Turnstile from './Turnstile.vue';
+
+const API_BASE = inject('API_BASE')
 
 const ViewLogin  = 'login';
 const ViewSignup = 'signup';
@@ -100,7 +102,7 @@ function onTurnstileSuccess(token) {
 
 onMounted(async () => {
     try {
-        const res = await fetch(window.api + '/turnstile');
+        const res = await fetch(API_BASE + '/turnstile');
         if (!res.ok) throw new Error('Failed to fetch sitekey');
         sitekey.value = await res.text();
     } catch (err) {

@@ -77,35 +77,37 @@ pub async fn login_handler(
         .and_then(|h| h.to_str().ok())
         .map(|s| s.to_string());
 
-    let sessions = match state.mysql.get_user_sessions(&user.id).await {
-        Ok(sessions) => sessions,
-        Err(e) => {
-            return auth_error!(e.to_string());
-        }
-    };
-
-    let filtered_sessions: Vec<SessionInfo> = sessions
-        .into_iter()
-        .map(|s| SessionInfo {
-            id: s.id,
-            ip_address: s.ip_address,
-            user_agent: s.user_agent,
-            last_accessed_at: s.last_accessed_at,
-        })
-        .collect();
-
     match state.mysql.create_session(&session_id, &user.id, &session_key, Some(&ip_address), user_agent.as_deref()).await {
-        Ok(_) => HttpResponse::Ok().json(json!({
-            "data": {
-                "id": user.id,
-                "email": user.email,
-                "icon_url": user.icon_url,
-                "created_at": user.created_at,
-                "session_key": session_key,
-                "session_id": session_id,
-                "sessions": filtered_sessions
-            }
-        })),
+        Ok(_) => {
+            let sessions = match state.mysql.get_user_sessions(&user.id).await {
+                Ok(sessions) => sessions,
+                Err(e) => {
+                    return auth_error!(e.to_string());
+                }
+            };
+
+            let filtered_sessions: Vec<SessionInfo> = sessions
+                .into_iter()
+                .map(|s| SessionInfo {
+                    id: s.id,
+                    ip_address: s.ip_address,
+                    user_agent: s.user_agent,
+                    last_accessed_at: s.last_accessed_at,
+                })
+                .collect();
+            
+            HttpResponse::Ok().json(json!({
+                "data": {
+                    "id": user.id,
+                    "email": user.email,
+                    "icon_url": user.icon_url,
+                    "created_at": user.created_at,
+                    "session_key": session_key,
+                    "session_id": session_id,
+                    "sessions": filtered_sessions
+                }
+            }))
+        },
         Err(e) => {
             db_error!("SESSION_CREATE_FAILED", "Failed to create session", e)
         }
@@ -117,24 +119,32 @@ pub async fn logout_handler(
     path: web::Path<String>,
     req: HttpRequest,
 ) -> HttpResponse {
-    let session_key = path.into_inner();
+    let target_session_id = path.into_inner();
 
-    match bearer_auth(state.clone(), &req).await {
-        Ok(_) => {},
-        Err(e) => {
-            return auth_error!(e.to_string());
+    let session = match bearer_auth(state.clone(), &req).await {
+        Ok(session) => session,
+        Err(e) => return auth_error!(e.to_string()),
+    };
+
+    let sessions = match state.mysql.get_user_sessions(&session.user_id).await {
+        Ok(sessions) => sessions,
+        Err(e) => return db_error!("DB_ERROR", "Failed to get sessions", e),
+    };
+
+    let target_session = match sessions.into_iter().find(|s| s.id == target_session_id) {
+        Some(s) => s,
+        None => {
+            return HttpResponse::Forbidden().json(json!({
+                "error": { "code": "FORBIDDEN", "message": "Cannot delete other user's session or session not found" }
+            }));
         }
     };
 
-    match state.mysql.delete_session(&session_key).await {
+    match state.mysql.delete_session(&target_session.session_key).await {
         Ok(_) => HttpResponse::Ok().json(json!({
-            "data": {
-                "message": "Logged out successfully"
-            }
+            "data": { "message": "Logged out successfully" }
         })),
-        Err(e) => {
-            db_error!("SESSION_DELETE_FAILED", "Failed to delete session", e)
-        }
+        Err(e) => db_error!("SESSION_DELETE_FAILED", "Failed to delete session", e),
     }
 }
 
